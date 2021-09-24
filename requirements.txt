@@ -1,0 +1,9 @@
+matplotlib
+requests
+numpy
+scipy
+sklearn
+sqlalchemy
+tdqm
+BeautifulSoup
+pandas

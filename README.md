@@ -29,3 +29,7 @@ This project aims to hone my Python skills by creating a COVID-19 stats tracker 
 - CRUD operations with SQLAlchemy
 - Data plotting with Matplotlib
 - Linear regression plotting
+
+**Version Control Systems**
+- Github repository 
+- Commit/push/pull 

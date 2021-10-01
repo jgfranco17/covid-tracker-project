@@ -31,6 +31,9 @@ class TestCustom:
 
     @staticmethod
     def test_tracker_properties():
+        """
+        Tests the CovidData class and default properties
+        """
         # Object property testing
         tracker_test = CovidData('Test')
         assert tracker_test.country == "Test"

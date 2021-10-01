@@ -16,6 +16,7 @@ This project aims to hone my Python skills by creating a COVID-19 stats tracker 
 - API use and JSON data formatting
 - Exception handling & custom exceptions
 - Unittest & Pytest testing
+- Type hints & annotations
 - Console output formatting
 
 **Object-oriented programming**

@@ -122,9 +122,9 @@ def timestamp() -> str:
     return f'{now.strftime("%d %B %Y, %I:%M:%S %p")}'
 
 
-def vowel_remove(string) -> str:
-    vowels = ('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')
-    string_list = list(str(string))
-    no_vowels = list(map(lambda c: c if c not in vowels else "", string_list))
+def vowel_remove(string: str) -> str:
+    vowels = ('a', 'e', 'i', 'o', 'u')
+    string_list = list(string)
+    no_vowels = list(map(lambda c: c if c.lower() not in vowels else "", string_list))
 
     return "".join(no_vowels)

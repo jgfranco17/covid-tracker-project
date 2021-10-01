@@ -37,7 +37,8 @@ class CovidData(object):
     def __init__(self, country: str):
         self.country = country.title()
         self.point_count = 0
-        self.categories = [prop.key.title() for prop in class_mapper(Point).iterate_properties if isinstance(prop, ColumnProperty)]
+        self.categories = [prop.key.title() for prop in class_mapper(Point).iterate_properties if
+                           isinstance(prop, ColumnProperty)]
         self.scraper = Scraper()
 
         # Database storage setup
@@ -152,13 +153,14 @@ class CovidData(object):
         }
 
     @staticmethod
-    def polynomial_data(x, y, deg=2):
+    def polynomial_data(x, y, deg: int = 2):
         fit = np.polyfit(x, y, deg)
         polynomial = np.poly1d(fit)
         line = np.linspace(x[0], x[-1], max(y))
         poly_rel = round(r2_score(y, polynomial(x)), 4)
         coefficients = list(map(lambda c: float(c), fit))
-        eq_comp = [f'{"+" if coefficients[i] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg - i}' for i in range(deg + 1)]
+        eq_comp = [f'{"+" if coefficients[i] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg - i}' for i in
+                   range(deg + 1)]
         poly_eq_form = ' '.join(eq_comp)
 
         return {

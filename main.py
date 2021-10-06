@@ -6,6 +6,7 @@ COVID-19 data tracking for different countries using API requests
 from https://api.covid19api.com/ routes.
 """
 from analysis import CovidData
+from controller import Controller
 
 
 if __name__ == "__main__":
@@ -13,5 +14,6 @@ if __name__ == "__main__":
     category = 'Confirmed'
 
     japan_tracker = CovidData(location)
-    japan_tracker.update()
+    controls = Controller(japan_tracker)
+    controls.run()
 

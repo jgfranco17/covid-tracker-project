@@ -78,6 +78,7 @@ class CovidData(object):
                 self.point_count = int(len(info))
 
                 # Gathers data for each day, stores in database
+                new_added = 0
                 for point in loading(range(self.point_count), desc=Colors.blink('Loading points')):
                     datapoint = info[point]
                     point_date = dt.datetime.strptime(datapoint["Date"], '%Y-%m-%dT%H:%M:%SZ')
@@ -91,7 +92,11 @@ class CovidData(object):
                             confirmed=datapoint["Confirmed"],
                             deaths=datapoint["Deaths"]
                         )
+                        new_added += 1
                 print(f'Compiled {Colors.yellow(self.point_count)} data points.')
+
+                if new_added != 0:
+                    print(f"Added in {new_added} additional points.")
 
             except Exception as e:
                 print(f'{Colors.red("ERROR - Data failed to compile.")}\nReason: {e}')
@@ -149,7 +154,8 @@ class CovidData(object):
             'intercept': intercept,
             'relation': lin_rel,
             'model': model,
-            'equation': f'{slope:,.2f}t {sign} {abs(intercept):,.2f}'
+            'equation': f'{slope:,.2f}t {sign} {abs(intercept):,.2f}',
+            'function': line
         }
 
     @staticmethod
@@ -187,8 +193,7 @@ class CovidData(object):
             category = kwargs.get('category', 'confirmed').lower()
             span = kwargs.get('span', 5)
             if span > self.point_count:
-                raise Exception(
-                    f"Invalid time span; only {self.point_count} data points available but {span} were requested.")
+                raise Exception(f"Invalid time span; only {self.point_count} data points available but {span} were requested.")
 
             # Setting up raw data
             points = self.db.query(Point).filter(Point.country == self.country)

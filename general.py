@@ -6,7 +6,9 @@ and system organization.
 """
 import datetime
 import time
+from dataclasses import dataclass
 
+@dataclass(frozen=True)
 class Colors:
     """
     OOP-implementation for console formatting options.

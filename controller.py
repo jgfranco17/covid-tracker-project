@@ -9,7 +9,14 @@ class Controller(object):
     def __init__(self, model:CovidData):
         self.running = True
         self.object = model
-        self.options = "OPTIONS:\n[0] Exit program\n[1] Display tracker properties\n[2] Update data\n[3] Display history\n[4] Check status"
+        self.options = [
+            "[0] Exit program",
+            "[1] Display tracker properties",
+            "[2] Update data",
+            "[3] Display history",
+            "[4] Check status"
+        ]
+
         self.input_history = []
 
         print(Colors.yellow(f"\n[{timestamp()}]"))
@@ -21,7 +28,8 @@ class Controller(object):
         """
         while self.running:
             try:
-                print(self.options)
+                print('OPTIONS:')
+                print("\n".join(self.options))
                 user_choice = int(input("\nEnter choice: "))
 
                 # Enact user choice

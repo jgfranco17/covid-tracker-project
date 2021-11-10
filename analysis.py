@@ -185,13 +185,14 @@ class CovidData(object):
         Keyword Args:
             start (int): Date to start the analysis
             end (int): Date to end the analysis
-            linear (bool): Check if the model should plot a linear line
-            polynomial (bool): Check if the model should plot a polynomial line
+            plot (bool): Check if the model should plot a chart
         """
         try:
             # Check keyword arguments for specifiers
             category = kwargs.get('category', 'confirmed').lower()
             span = kwargs.get('span', 5)
+            plot = kwargs.get('plot', False)
+            avg = lambda d: sum(d) / len(d)
             if span > self.point_count:
                 raise Exception(f"Invalid time span; only {self.point_count} data points available but {span} were requested.")
 
@@ -207,10 +208,16 @@ class CovidData(object):
             else:
                 raise ValueError(f"Invalid category provided")
 
+            if plot:
+                self.data_plot(
+                    data_set=data_set,
+                    polynomial=True
+                )
+
             print("-" * 25)
             print(f"{self.country.upper()} STATISTICAL DATA")
             print(f"Presenting {category} ({span} of {self.point_count} data points)")
-            print(f"{span}-day average: {sum(data_set) / len(data_set):,.2f}")
+            print(f"{span}-day average: {avg(data_set):,.2f}")
             print(f"Highest: {max(data_set):,}\nLowest: {min(data_set):,}")
             print(f"Standard deviation over {span} days: {np.std(data_set):,.2f}")
 
@@ -242,7 +249,7 @@ class CovidData(object):
             poly = kwargs.get('polynomial', False)
             x_label = kwargs.get('xlabel', f'Last {span} Days')
             y_label = kwargs.get('ylabel', "Data")
-            lin_rel = poly_rel = 0
+            lin_rel, poly_rel = 0, 0
             x, y = list(range(1, len(data_set) + 1)), data_set
             plt.scatter(x, y)
 
@@ -274,7 +281,6 @@ class CovidData(object):
             # Chart formatting and labels
             print("-" * 25)
             plt.xlim(0, span)
-            plt.ylim(0, max(data_set))
             plt.xlabel(x_label)
             plt.ylabel(y_label)
             plt.title(f'COVID-19 Data: {self.country}, {span} days')

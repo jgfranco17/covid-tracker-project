@@ -14,6 +14,5 @@ if __name__ == "__main__":
     category = 'Confirmed'
 
     japan_tracker = CovidData(location)
-    controls = Controller(japan_tracker)
-    controls.run()
+    japan_tracker.case_updates(category="confirmed", span=30, plot=True)
 

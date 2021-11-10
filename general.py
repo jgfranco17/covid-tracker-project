@@ -90,7 +90,7 @@ def timer(func):
         start_time = time.time()
         rv = func(*args, **kwargs)
         end_time = time.time()
-        print(f'\n[Elapsed time: {round((end_time - start_time), 3)} s]\n')
+        print(f'\n[Elapsed time: {round((end_time - start_time), 2)}s]\n')
         return rv
 
     return timer_wrapper

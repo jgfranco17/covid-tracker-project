@@ -14,6 +14,8 @@ from matplotlib import pyplot as plt
 from sqlalchemy.orm import sessionmaker, class_mapper, ColumnProperty
 from tqdm import tqdm as loading
 from sklearn.metrics import r2_score
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import FunctionTransformer
 
 # Project files
 from models import Point, create_database
@@ -45,6 +47,9 @@ class CovidData(object):
         self.db_location, self.engine = create_database(country.lower())
         Session = sessionmaker()
         self.db = Session(bind=self.engine)
+
+        self.transformer = FunctionTransformer(np.log, validate=True)
+        self.regressor = LinearRegression()
 
         print(Colors.green(f"\n[{timestamp()}]"))
         print(f"Data Tracker object created for {Colors.bold(self.country)}.")
@@ -229,7 +234,7 @@ class CovidData(object):
             if plot:
                 self.data_plot(
                     data_set=data_set,
-                    polynomial=True,
+                    log=True,
                     ylabel=category.title()
                 )
 
@@ -291,6 +296,11 @@ class CovidData(object):
                 poly_rel = poly_plot_data['relation']
 
             if log:
+                x_trans = self.transformer.fit_transform(x)
+                regressor = LinearRegression()
+                results = regressor.fit(x_trans, y)
+                y_fit = results.predict(x_trans)
+                plt.plot(x, y_fit, c="hotpink")
                 log_plot_data = self.logarithmic_data(x, y)
 
             # If both are collected, draw comparison of regressions

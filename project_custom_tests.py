@@ -1,7 +1,8 @@
 import pytest
 import os
 from analysis import CovidData
-from general import timestamp, Colors, percent_diff, vowel_remove
+from general import timestamp, Colors, vowel_remove
+from mathfunctions import percent_diff
 
 
 class TestCustom:

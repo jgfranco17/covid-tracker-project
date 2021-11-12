@@ -96,29 +96,6 @@ def timer(func):
     return timer_wrapper
 
 
-def percent_diff(expected, actual) -> float:
-    """
-    Calculates the percent difference between 2 values
-
-    Args:
-        expected: Expected value
-        actual: Real/acquired value
-
-    Returns:
-        float value
-    """
-    sign = 1 if expected > actual else -1
-    value = (abs(actual - expected) / ((actual + expected) / 2)) * 100
-    return sign * round(value, 2)
-
-
-def min_max_change(minimum, maximum, base_value) -> dict:
-    return {
-        'min': percent_diff(minimum, base_value),
-        'max': percent_diff(maximum, base_value)
-    }
-
-
 def timestamp() -> str:
     now = datetime.datetime.now()
     return f'{now.strftime("%d %B %Y, %I:%M:%S %p")}'

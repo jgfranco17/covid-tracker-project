@@ -14,5 +14,5 @@ if __name__ == "__main__":
     category = 'Confirmed'
 
     japan_tracker = CovidData(location)
-    japan_tracker.case_updates(category="confirmed", span=30, plot=True)
+    japan_tracker.case_updates(category="deaths", span=60, plot=True)
 

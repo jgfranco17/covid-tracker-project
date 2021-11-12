@@ -4,13 +4,13 @@ ANALYSIS.PY
 Hosts the class architecture of the COVID-tracker object.
 """
 # General Python modules
-import matplotlib.pyplot as plt
 import requests
 import json
 import numpy as np
 import datetime as dt
 import traceback as tb
 from scipy import stats
+from matplotlib import pyplot as plt
 from sqlalchemy.orm import sessionmaker, class_mapper, ColumnProperty
 from tqdm import tqdm as loading
 from sklearn.metrics import r2_score
@@ -68,7 +68,7 @@ class CovidData(object):
         """
 
         def load_data(self, *args, **kwargs):
-            url = f'https://api.covid19api.com/total/country/{self.country.lower()}'
+            url = self.get_link()
 
             try:
                 # Get JSON data via API call
@@ -83,8 +83,10 @@ class CovidData(object):
                     datapoint = info[point]
                     point_date = dt.datetime.strptime(datapoint["Date"], '%Y-%m-%dT%H:%M:%SZ')
 
-                    check = self.db.query(Point).filter(Point.country == self.country, Point.date == point_date).first()
-                    if check is None:
+                    check = self.db.query(Point).filter(
+                        Point.country == self.country, Point.date == point_date
+                    )
+                    if check.first() is None:
                         self.add_point(
                             country=self.country,
                             date=point_date,
@@ -141,6 +143,9 @@ class CovidData(object):
         except Exception as e:
             print(f'Error during Point commit: {e}')
 
+    def get_link(self) -> str:
+        return f'https://api.covid19api.com/total/country/{self.country.lower()}'
+
     @staticmethod
     def linear_data(x, y) -> dict:
         slope, intercept, r, p, std_err = stats.linregress(x, y)
@@ -159,14 +164,14 @@ class CovidData(object):
         }
 
     @staticmethod
-    def polynomial_data(x, y, deg: int = 2):
+    def polynomial_data(x, y, deg: int = 2) -> dict:
         fit = np.polyfit(x, y, deg)
         polynomial = np.poly1d(fit)
         line = np.linspace(x[0], x[-1], max(y))
         poly_rel = round(r2_score(y, polynomial(x)), 4)
         coefficients = list(map(lambda c: float(c), fit))
-        eq_comp = [f'{"+" if coefficients[i] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg - i}' for i in
-                   range(deg + 1)]
+        eq_comp = [f'{"+" if coefficients[i]>0 else "-"} {abs(coefficients[i]):,.2f}t^{deg-i}' for i in
+                   range(deg+1)]
         poly_eq_form = ' '.join(eq_comp)
 
         return {
@@ -174,6 +179,19 @@ class CovidData(object):
             'line': line,
             'polynomial': polynomial(line),
             'equation': poly_eq_form
+        }
+
+    @staticmethod
+    def logarithmic_data(x, y) -> dict:
+        logfit = np.polyfit(np.log(x), y, 1)
+        eq_comp = [f'{"+" if result>0 else "-"} {abs(result):,.2f}' for result in logfit]
+        log_eq_form = ' '.join(eq_comp)
+
+        return {
+            'logarithm': logfit,
+            'equation': log_eq_form,
+            'A': logfit[0],
+            'B': logfit[1]
         }
 
     @timer
@@ -194,10 +212,10 @@ class CovidData(object):
             plot = kwargs.get('plot', False)
             avg = lambda d: sum(d) / len(d)
             if span > self.point_count:
-                raise Exception(f"Invalid time span; only {self.point_count} data points available but {span} were requested.")
+                raise Exception(f"Only {self.point_count} data points available but {span} were requested.")
 
             # Setting up raw data
-            points = self.db.query(Point).filter(Point.country == self.country)
+            points = self.db.query(Point).filter(Point.country==self.country)
 
             if category == "confirmed":
                 data_set = [point.confirmed for point in points][-span:]
@@ -211,14 +229,15 @@ class CovidData(object):
             if plot:
                 self.data_plot(
                     data_set=data_set,
-                    polynomial=True
+                    polynomial=True,
+                    ylabel=category.title()
                 )
 
             print("-" * 25)
             print(f"{self.country.upper()} STATISTICAL DATA")
-            print(f"Presenting {category} ({span} of {self.point_count} data points)")
-            print(f"{span}-day average: {avg(data_set):,.2f}")
+            print(f"Presenting {category} ({span} of {self.point_count} data points).")
             print(f"Highest: {max(data_set):,}\nLowest: {min(data_set):,}")
+            print(f"{span}-day average: {avg(data_set):,.2f}")
             print(f"Standard deviation over {span} days: {np.std(data_set):,.2f}")
 
         except Exception as e:
@@ -247,6 +266,7 @@ class CovidData(object):
             span = len(data_set)
             lin = kwargs.get('linear', False)
             poly = kwargs.get('polynomial', False)
+            log = kwargs.get('logarithmic', False)
             x_label = kwargs.get('xlabel', f'Last {span} Days')
             y_label = kwargs.get('ylabel', "Data")
             lin_rel, poly_rel = 0, 0
@@ -270,16 +290,17 @@ class CovidData(object):
                 print(f"Polynomial R-squared: {poly_plot_data['relation']}")
                 poly_rel = poly_plot_data['relation']
 
+            if log:
+                log_plot_data = self.logarithmic_data(x, y)
+
             # If both are collected, draw comparison of regressions
             if lin and poly:
-                print("-" * 25)
                 values = {'Linear': lin_rel, 'Polynomial': poly_rel}
                 higher, lower = max(values, key=values.get), min(values, key=values.get)
                 print(f"{higher} regression yielded a higher R^2 at {values[higher]}")
                 print(f"{lower} regression was only {values[lower]}, around {values[higher] - values[lower]:.5f} lower")
 
             # Chart formatting and labels
-            print("-" * 25)
             plt.xlim(0, span)
             plt.xlabel(x_label)
             plt.ylabel(y_label)

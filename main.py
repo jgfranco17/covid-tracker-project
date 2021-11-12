@@ -8,11 +8,14 @@ from https://api.covid19api.com/ routes.
 from analysis import CovidData
 from controller import Controller
 
-
-if __name__ == "__main__":
+def main():
     location = 'Japan'
     category = 'Confirmed'
 
     japan_tracker = CovidData(location)
     japan_tracker.case_updates(category="deaths", span=60, plot=True)
+
+
+if __name__ == "__main__":
+    main()
 

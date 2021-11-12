@@ -175,8 +175,10 @@ class CovidData(object):
         line = np.linspace(x[0], x[-1], max(y))
         poly_rel = round(r2_score(y, polynomial(x)), 4)
         coefficients = list(map(lambda c: float(c), fit))
-        eq_comp = [f'{"+" if coefficients[i]>0 else "-"} {abs(coefficients[i]):,.2f}t^{deg-i}' for i in
-                   range(deg+1)]
+        eq_comp = [
+            f'{"+" if coefficients[i] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg - i}' for i in
+            range(deg + 1)
+        ]
         poly_eq_form = ' '.join(eq_comp)
 
         return {
@@ -189,12 +191,12 @@ class CovidData(object):
     @staticmethod
     def logarithmic_data(x, y) -> dict:
         logfit = np.polyfit(np.log(x), y, 1)
-        eq_comp = [f'{"+" if result>0 else "-"} {abs(result):,.2f}' for result in logfit]
-        log_eq_form = ' '.join(eq_comp)
+        A = f'{"+" if logfit[0] > 0 else "-"} {abs(logfit[0]):,.2f}'
+        B = f'{"+" if logfit[0] > 0 else "-"} {abs(logfit[1]):,.2f}'
 
         return {
-            'logarithm': logfit,
-            'equation': log_eq_form,
+            'log': logfit,
+            'equation': f'{A} + {B}log(x)',
             'A': logfit[0],
             'B': logfit[1]
         }
@@ -217,10 +219,11 @@ class CovidData(object):
             plot = kwargs.get('plot', False)
             avg = lambda d: sum(d) / len(d)
             if span > self.point_count:
-                raise Exception(f"Only {self.point_count} data points available but {span} were requested.")
+                msg = f"Only {self.point_count} data points available but {span} were requested."
+                raise Exception(msg)
 
             # Setting up raw data
-            points = self.db.query(Point).filter(Point.country==self.country)
+            points = self.db.query(Point).filter(Point.country == self.country)
 
             if category == "confirmed":
                 data_set = [point.confirmed for point in points][-span:]
@@ -234,7 +237,7 @@ class CovidData(object):
             if plot:
                 self.data_plot(
                     data_set=data_set,
-                    log=True,
+                    logarithmic=True,
                     ylabel=category.title()
                 )
 
@@ -302,13 +305,16 @@ class CovidData(object):
                 y_fit = results.predict(x_trans)
                 plt.plot(x, y_fit, c="hotpink")
                 log_plot_data = self.logarithmic_data(x, y)
+                print("-" * 25)
+                print(f"C(t) = {log_plot_data['equation']}")
 
             # If both are collected, draw comparison of regressions
             if lin and poly:
                 values = {'Linear': lin_rel, 'Polynomial': poly_rel}
                 higher, lower = max(values, key=values.get), min(values, key=values.get)
+                higher_reg, lower_reg = values[lower], round(values[higher] - values[lower], 5)
                 print(f"{higher} regression yielded a higher R^2 at {values[higher]}")
-                print(f"{lower} regression was only {values[lower]}, around {values[higher] - values[lower]:.5f} lower")
+                print(f"{lower} regression was only {higher_reg}, around {lower_reg} lower")
 
             # Chart formatting and labels
             plt.xlim(0, span)
@@ -361,14 +367,16 @@ class CovidData(object):
                 print(f"Gathered data for {cls.country}.")
 
             # Generate plot data and basic scatter plot
-            data_own, data_other = collection[self.country]['data'], collection[other.country]['data']
+            data_own = collection[self.country]['data']
+            data_other = collection[other.country]['data']
             x, y_own, y_other = list(range(1, len(data_own) + 1)), data_own, data_other
+            countries = ", ".join([cls.country for cls in main_objects])
             plt.scatter(x, y_own)
             plt.scatter(x, y_other)
             plt.xlim(0, span + 1)
             plt.xlabel(f'Last {span} Days')
             plt.ylabel(f'{category.title()} Cases')
-            plt.title(f'COVID-19 Data: {", ".join([cls.country for cls in main_objects])} ({span} days)')
+            plt.title(f'COVID-19 Data: {countries} | ({span} days)')
             plt.show()
 
             # Display each country's data

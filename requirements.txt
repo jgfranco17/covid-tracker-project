@@ -2,6 +2,7 @@ matplotlib
 requests
 numpy
 scipy
+sympy
 sklearn
 sqlalchemy
 tdqm

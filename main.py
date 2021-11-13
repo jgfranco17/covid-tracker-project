@@ -10,10 +10,10 @@ from controller import Controller
 
 def main():
     location = 'Japan'
-    category = 'Confirmed'
+    category = 'deaths'
 
     japan_tracker = CovidData(location)
-    japan_tracker.case_updates(category="deaths", span=60, plot=True)
+    japan_tracker.case_updates(category=category, span=60, plot=True)
 
 
 if __name__ == "__main__":

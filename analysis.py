@@ -177,7 +177,7 @@ class CovidData(object):
         coefficients = list(map(lambda c: float(c), fit))
         eq_comp = [
             f'{"+" if coefficients[i] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg - i}' for i in
-            range(deg + 1)
+            range(deg + 1) if round(coefficients[i], 2) != 0
         ]
         poly_eq_form = ' '.join(eq_comp)
 
@@ -199,6 +199,45 @@ class CovidData(object):
             'equation': f'{A} + {B}log(x)',
             'A': logfit[0],
             'B': logfit[1]
+        }
+
+    @staticmethod
+    def percent_diff(expected, actual) -> float:
+        """
+        Calculates the percent difference between 2 values
+
+        Args:
+            expected: Expected value
+            actual: Real/acquired value
+
+        Returns:
+            Float value
+        """
+        sign = 1 if expected > actual else -1
+        value = (abs(actual - expected) / ((actual + expected) / 2)) * 100
+        return sign * round(value, 2)
+
+    @staticmethod
+    def logfunc(var, coeff_outer, coeff_inner, constant) -> float:
+        """
+        Return values from a general log function.
+        """
+        return coeff_outer * np.log(coeff_inner * var) + constant
+
+    def min_max_change(self, minimum, maximum, base_value) -> dict:
+        """
+
+        Args:
+            minimum: Smaller value
+            maximum: Larger value
+            base_value: base number to compare to
+
+        Returns:
+            Dictionary of results
+        """
+        return {
+            'min': self.percent_diff(minimum, base_value),
+            'max': self.percent_diff(maximum, base_value)
         }
 
     @timer
@@ -237,7 +276,7 @@ class CovidData(object):
             if plot:
                 self.data_plot(
                     data_set=data_set,
-                    logarithmic=True,
+                    polynomial=True,
                     ylabel=category.title()
                 )
 
@@ -250,7 +289,6 @@ class CovidData(object):
 
         except Exception as e:
             print(f'ERROR - Data failed to compare.\nReason: {e}')
-            tb.print_exc()
 
     @processing
     def update(self):
@@ -266,6 +304,7 @@ class CovidData(object):
         Keyword Args:
             lin (bool): Check if a linear plot should be made
             poly (bool): Check if a polynomial plot should be made
+            log (bool): Check if a logarithmic plot should be made
             x_label (str): X-axis chart label
             y_label (str): Y-axis chart label
         """
@@ -303,7 +342,7 @@ class CovidData(object):
                 regressor = LinearRegression()
                 results = regressor.fit(x_trans, y)
                 y_fit = results.predict(x_trans)
-                plt.plot(x, y_fit, c="hotpink")
+                plt.plot(x, y_fit, c="F92672")
                 log_plot_data = self.logarithmic_data(x, y)
                 print("-" * 25)
                 print(f"C(t) = {log_plot_data['equation']}")

@@ -52,7 +52,7 @@ class Colors:
         return '\033[6m' + str(string) + '\033[0m'
 
     @staticmethod
-    def colprint(string, **kwargs) -> str:
+    def colprint(string, **kwargs):
         content = str(string)
         color = kwargs.get('color', 'green').lower()
         bold = kwargs.get('bold', False)
@@ -89,11 +89,47 @@ def timer(func):
     def timer_wrapper(*args, **kwargs):
         start_time = time.time()
         rv = func(*args, **kwargs)
-        end_time = time.time()
-        print(f'\n[Elapsed time: {round((end_time - start_time), 2)}s]\n')
+        runtime = time_interval(start_time)
+        print(f'\n[Elapsed time: {runtime}]\n')
         return rv
 
     return timer_wrapper
+
+
+def time_interval(start_period: float) -> str:
+    """
+    Calculates time interval, given a starting time.
+
+    Parameters:
+        start_period (float): Starting time
+
+    Returns:
+        time interval (str)
+    """
+    def convert_time_diff(duration):
+        duration = round(duration, 2)
+        d_hours = int(duration // 3600)
+        d_minutes = int((duration - (d_hours * 3600)) // 60)
+        d_seconds = int(round(duration - (d_hours * 3600) - (d_minutes * 60)))
+
+        return d_hours, d_minutes, d_seconds
+
+    try:
+        hours, minutes, seconds = convert_time_diff(time.time() - start_period)
+        time_elapsed = []
+
+        if hours:
+            time_elapsed.append(f'{hours}h')
+        if minutes:
+            time_elapsed.append(f'{minutes}m')
+        if seconds:
+            time_elapsed.append(f'{seconds}s')
+
+        return str(' '.join(time_elapsed))
+
+    except Exception as e:
+        print(f'Time interval computation error: {e}')
+        return "ERROR"
 
 
 def timestamp() -> str:

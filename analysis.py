@@ -20,7 +20,7 @@ from sklearn.preprocessing import FunctionTransformer
 # Project files
 from models import Point, create_database
 from general import Colors, timer, timestamp
-from scraping import Scraper
+from customexceptions import InvalidCategoryError, DataBoundsError
 
 
 class CovidData(object):
@@ -41,7 +41,6 @@ class CovidData(object):
         self.point_count = 0
         self.categories = [prop.key.title() for prop in class_mapper(Point).iterate_properties if
                            isinstance(prop, ColumnProperty)]
-        self.scraper = Scraper()
 
         # Database storage setup
         self.db_location, self.engine = create_database(country.lower())
@@ -61,7 +60,7 @@ class CovidData(object):
         return f'<COVID-19 Tracker [{self.country}], {self.point_count} data points>'
 
     def __eq__(self, other):
-        return self.country == other.country
+        return self.country == other.country and self.point_count == other.point_count
 
     def processing(func):
         """
@@ -100,6 +99,7 @@ class CovidData(object):
                             deaths=datapoint["Deaths"]
                         )
                         new_added += 1
+
                 print(f'Compiled {Colors.yellow(self.point_count)} data points.')
 
                 if new_added != 0:
@@ -107,9 +107,9 @@ class CovidData(object):
 
             except Exception as e:
                 print(f'{Colors.red("ERROR - Data failed to compile.")}\nReason: {e}')
-                tb.print_exc()
 
             finally:
+                # Ensure that the decorator returns the function regardless
                 return func(self, *args, **kwargs)
 
         return load_data
@@ -258,8 +258,7 @@ class CovidData(object):
             plot = kwargs.get('plot', False)
             avg = lambda d: sum(d) / len(d)
             if span > self.point_count:
-                msg = f"Only {self.point_count} data points available but {span} were requested."
-                raise Exception(msg)
+                raise DataBoundsError(limit=self.point_count, attempt=span)
 
             # Setting up raw data
             points = self.db.query(Point).filter(Point.country == self.country)
@@ -271,7 +270,7 @@ class CovidData(object):
             elif category == "deaths":
                 data_set = [point.deaths for point in points][-span:]
             else:
-                raise ValueError(f"Invalid category provided")
+                raise InvalidCategoryError()
 
             if plot:
                 self.data_plot(

@@ -7,6 +7,8 @@ Hosts the class architecture of the COVID-tracker object.
 import requests
 import json
 import numpy as np
+import pandas as pd
+import logging as lg
 import datetime as dt
 import traceback as tb
 from scipy import stats
@@ -15,6 +17,8 @@ from sqlalchemy.orm import sessionmaker, class_mapper, ColumnProperty
 from tqdm import tqdm as loading
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVR
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import FunctionTransformer
 
 # Project files
@@ -41,14 +45,29 @@ class CovidData(object):
         self.point_count = 0
         self.categories = [prop.key.title() for prop in class_mapper(Point).iterate_properties if
                            isinstance(prop, ColumnProperty)]
+        self.transformer = FunctionTransformer(np.log, validate=True)
+        self.regressor = LinearRegression()
+        self.data = {"active": None, "confirmed": None, "deaths": None, "date": None}
 
         # Database storage setup
         self.db_location, self.engine = create_database(country.lower())
         Session = sessionmaker()
         self.db = Session(bind=self.engine)
 
-        self.transformer = FunctionTransformer(np.log, validate=True)
-        self.regressor = LinearRegression()
+        # Set up prediction model
+        self.day_range = 0
+        self.predicted_values = []
+        self.max_cases = None
+        self.min_cases = None
+        self.max_day = 0
+        self.min_day = 0
+        self.lr_prediction = 0
+        self.svm_prediction = 0
+
+        # Configure logging
+        log_fmt = "[%(levelname)s] %(asctime)s %(message)s"
+        lg.basicConfig(level=lg.DEBUG, format=log_fmt)
+        lg.getLogger('matplotlib.font_manager').setLevel(lg.WARNING)
 
         print(Colors.green(f"\n[{timestamp()}]"))
         print(f"Data Tracker object created for {Colors.bold(self.country)}.")
@@ -113,6 +132,36 @@ class CovidData(object):
                 return func(self, *args, **kwargs)
 
         return load_data
+
+    def loadup(func):
+        """
+        Takes the stored country name and gathers data from the API,
+        stores it in the object's database.
+
+        Wrapper function, used to run data retrieval and processing prior
+        to the execution of another data-dependent function.
+        """
+
+        def load_wrapper(self, *args, **kwargs):
+            points = self.db.query(Point).filter(Point.country == self.country)
+            try:
+                self.data = {
+                    "active": [point.active for point in points][::-1],
+                    "confirmed": [point.confirmed for point in points][::-1],
+                    "deaths": [point.deaths for point in points][::-1],
+                    "date": [point.date for point in points][::-1]
+                }
+
+                print(f'Loaded data points for {self.country}.')
+
+            except Exception as e:
+                print(f'{Colors.red("ERROR - Data failed to load.")}\nReason: {e}')
+
+            finally:
+                # Ensure that the decorator returns the function regardless
+                return func(self, *args, **kwargs)
+
+        return load_wrapper
 
     def add_point(self, **kwargs):
         """
@@ -293,8 +342,85 @@ class CovidData(object):
     def update(self):
         print(f"Updated data for {self.country}.")
 
+    @timer
+    @processing
+    @loadup
+    def predict(self, forecast: int = 15, category: str = "active"):
+        """
+        Uses SVM learning algorithm to predict data for COVID-19
+        category of choice.
+
+        Args:
+            forecast (int): Duration of prediction forecast
+            category (str): Data set to predict
+        """
+        show_data = False
+        self.day_range = forecast  # as forecast duration increases, accuracy decreases
+
+        # Set up dataframe
+        data_set = self.data[category.lower()]
+        dates = self.data["date"]
+        print(type(data_set), type(dates))
+        idx = [i + 1 for i in range(len(data_set))]
+        df = pd.DataFrame(
+            list(zip(data_set, dates)),
+            index=idx,
+            columns=[category.title(), "Dates"]
+        )
+        print(f'Getting data for {self.country}: {category}')
+
+        df['Prediction'] = df[[category.title()]].shift(-forecast)
+        print(f'{category.title()} data: {len(df)} data points')
+        x_data = np.array(df.drop(['Prediction'], 1))
+        y_data = np.array(df['Prediction'])
+        print("Successfully converted the dataframes into arrays.")
+        X = x_data[:-forecast]
+        Y = y_data[:-forecast]
+
+        # Creating the predictive model
+        try:
+            # Setting up the training via SVR
+            x_tr, x_te, y_tr, y_te = train_test_split(X, Y, test_size=0.2)
+            svr_rbf = SVR(kernel='rbf', C=1e3, gamma=0.1)
+            svr_rbf.fit(x_tr, y_tr)
+
+            # Model confidence scoring
+            svm_confidence = svr_rbf.score(x_te, y_te)
+            lr = LinearRegression()
+            lr.fit(x_tr, y_tr)
+            lr_confidence = lr.score(x_te, y_te)
+            print(f'SV Model Confidence: {round(svm_confidence * 100, 3)}%')
+            print(f'Regression Confidence: {round(lr_confidence * 100, 3)}%')
+
+            # Generate SVR model predictions
+            x_forecast = np.array(df.drop(['Prediction'], 1))[-forecast:]
+            self.lr_prediction = lr.predict(x_forecast)
+            self.svm_prediction = svr_rbf.predict(x_forecast)
+            if show_data:
+                print(f'SVR Data Prediction:\n{self.svm_prediction}')
+                print(f'Linear Regression Data Prediction:\n{self.lr_prediction}')
+
+            # Compiling the data sets
+            predicted_values = (self.lr_prediction + self.svm_prediction)
+            self.max_cases = float(round(np.max(predicted_values), 2))
+            self.max_day = int(np.where(predicted_values == np.max(predicted_values))[0])
+            self.min_cases = float(round(np.min(predicted_values), 2))
+            self.min_day = int(np.where(predicted_values == np.min(predicted_values))[0])
+            self.predicted_values = predicted_values.tolist()
+            self.get_model_data()
+
+        except Exception as err:
+            print(f'Error during training model: {err}')
+
+    def get_model_data(self):
+        print('--- KEY INFORMATION ---')
+        print(f'COUNTRY: {self.country}\n')
+        print(f'--- CURRENT DATA FOR THE NEXT {self.day_range} DAYS ---')
+        print(f'MAX: {self.max_cases}, in {self.max_day} days')
+        print(f'MIN: {self.min_cases}, in {self.min_day} days')
+
     def data_plot(self, data_set: list, **kwargs):
-        """[summary]
+        """
         Generates plot of country data from Day 1 to present.
 
         Args:
@@ -363,70 +489,4 @@ class CovidData(object):
 
         except Exception as e:
             print(f'ERROR - Data failed to plot.\nReason: {e}')
-            tb.print_exc()
-
-    def compare_data(self, other, **kwargs):
-        """
-        Compares the data of this tracker's country and that of another tracker object.
-
-        Args:
-            other (CovidData): CovidData tracker object instance to compare with
-        """
-        category = kwargs.get('category', 'active').lower()
-        span = kwargs.get('span', 30)
-        main_objects = [self, other]
-
-        try:
-            # Create collection of data
-            collection = {}
-            for cls in loading(main_objects, desc='Loading data for comparison'):
-                points = cls.db.query(Point).filter(Point.country == cls.country)
-                average = lambda d: sum(d) / len(d)
-
-                if category == "confirmed":
-                    data = [point.confirmed for point in points]
-                elif category == "active":
-                    data = [point.active for point in points]
-                elif category == "deaths":
-                    data = [point.confirmed for point in points]
-                else:
-                    raise Exception(f"Invalid category provided.")
-
-                entry = {
-                    'country': cls.country,
-                    'data': data[-span:],
-                    'max': max(data[-span:]),
-                    'min': min(data[-span:]),
-                    'average': round(average(data[-span:]), 2),
-                    'std dev': round(float(np.std(data[-span:])), 2)
-                }
-
-                collection.update({cls.country: entry})
-                print(f"Gathered data for {cls.country}.")
-
-            # Generate plot data and basic scatter plot
-            data_own = collection[self.country]['data']
-            data_other = collection[other.country]['data']
-            x, y_own, y_other = list(range(1, len(data_own) + 1)), data_own, data_other
-            countries = ", ".join([cls.country for cls in main_objects])
-            plt.scatter(x, y_own)
-            plt.scatter(x, y_other)
-            plt.xlim(0, span + 1)
-            plt.xlabel(f'Last {span} Days')
-            plt.ylabel(f'{category.title()} Cases')
-            plt.title(f'COVID-19 Data: {countries} | ({span} days)')
-            plt.show()
-
-            # Display each country's data
-            for country in collection:
-                data_set = collection[country]
-                print("-" * 25)
-                print(f"{country.upper()} DATA")
-                print(f"{span}-day average: {data_set['average']:,}")
-                print(f"Highest: {data_set['max']:,} | Lowest: {data_set['min']:,}")
-                print(f"Data range: {data_set['max'] - data_set['min']:,}")
-                print(f"Standard deviation over {span} days: {data_set['std dev']:,.2f}")
-
-        except Exception as e:
-            print(f'ERROR - Failed to compare trackers.\nReason: {e}')
             tb.print_exc()

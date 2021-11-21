@@ -5,6 +5,7 @@ Created on 12 Sept 2021
 COVID-19 data tracking for different countries using API requests
 from https://api.covid19api.com/ routes.
 """
+import logging
 from analysis import CovidData
 from controller import Controller
 
@@ -13,7 +14,8 @@ def main():
     category = 'deaths'
 
     japan_tracker = CovidData(location)
-    japan_tracker.case_updates(category=category, span=60, plot=True)
+    # japan_tracker.case_updates(category=category, span=60, plot=True)
+    japan_tracker.predict(forecast=30, category=category)
 
 
 if __name__ == "__main__":

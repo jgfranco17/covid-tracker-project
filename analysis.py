@@ -6,11 +6,13 @@ Hosts the class architecture of the COVID-tracker object.
 # General Python modules
 import requests
 import json
+import csv
 import numpy as np
 import pandas as pd
 import logging as lg
 import datetime as dt
 import traceback as tb
+from os import path
 from scipy import stats
 from matplotlib import pyplot as plt
 from sqlalchemy.orm import sessionmaker, class_mapper, ColumnProperty
@@ -146,10 +148,10 @@ class CovidData(object):
             points = self.db.query(Point).filter(Point.country == self.country)
             try:
                 self.data = {
-                    "active": [point.active for point in points][::-1],
-                    "confirmed": [point.confirmed for point in points][::-1],
-                    "deaths": [point.deaths for point in points][::-1],
-                    "date": [point.date for point in points][::-1]
+                    "active": [point.active for point in points],
+                    "confirmed": [point.confirmed for point in points],
+                    "deaths": [point.deaths for point in points],
+                    "date": [point.date for point in points]
                 }
 
                 print(f'Loaded data points for {self.country}.')
@@ -225,8 +227,8 @@ class CovidData(object):
         poly_rel = round(r2_score(y, polynomial(x)), 4)
         coefficients = list(map(lambda c: float(c), fit))
         eq_comp = [
-            f'{"+" if coefficients[i] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg - i}' for i in
-            range(deg + 1) if round(coefficients[i], 2) != 0
+            f'{"+" if coefficients[i+1] > 0 else "-"} {abs(coefficients[i]):,.2f}t^{deg-i+1}' for i in
+            range(deg) if round(coefficients[i], 2) != 0
         ]
         poly_eq_form = ' '.join(eq_comp)
 
@@ -363,19 +365,21 @@ class CovidData(object):
         print(type(data_set), type(dates))
         idx = [i + 1 for i in range(len(data_set))]
         df = pd.DataFrame(
-            list(zip(data_set, dates)),
+            data_set,
             index=idx,
-            columns=[category.title(), "Dates"]
+            columns=[category.title()]
         )
         print(f'Getting data for {self.country}: {category}')
 
         df['Prediction'] = df[[category.title()]].shift(-forecast)
         print(f'{category.title()} data: {len(df)} data points')
-        x_data = np.array(df.drop(['Prediction'], 1))
+        dropped = df.drop(['Prediction'])
+        x_data = np.array(dropped, 1)
         y_data = np.array(df['Prediction'])
         print("Successfully converted the dataframes into arrays.")
         X = x_data[:-forecast]
         Y = y_data[:-forecast]
+        print(dropped)
 
         # Creating the predictive model
         try:
@@ -386,31 +390,29 @@ class CovidData(object):
 
             # Model confidence scoring
             svm_confidence = svr_rbf.score(x_te, y_te)
-            lr = LinearRegression()
-            lr.fit(x_tr, y_tr)
-            lr_confidence = lr.score(x_te, y_te)
+            self.regressor.fit(x_tr, y_tr)
+            lr_confidence = self.regressor.score(x_te, y_te)
             print(f'SV Model Confidence: {round(svm_confidence * 100, 3)}%')
             print(f'Regression Confidence: {round(lr_confidence * 100, 3)}%')
 
             # Generate SVR model predictions
-            x_forecast = np.array(df.drop(['Prediction'], 1))[-forecast:]
-            self.lr_prediction = lr.predict(x_forecast)
+            x_forecast = x_data[-forecast:]
+            self.lr_prediction = self.regressor.predict(x_forecast)
             self.svm_prediction = svr_rbf.predict(x_forecast)
             if show_data:
                 print(f'SVR Data Prediction:\n{self.svm_prediction}')
                 print(f'Linear Regression Data Prediction:\n{self.lr_prediction}')
 
             # Compiling the data sets
-            predicted_values = (self.lr_prediction + self.svm_prediction)
+            predicted_values = (self.lr_prediction + self.svm_prediction) / 2
             self.max_cases = float(round(np.max(predicted_values), 2))
-            self.max_day = int(np.where(predicted_values == np.max(predicted_values))[0])
             self.min_cases = float(round(np.min(predicted_values), 2))
-            self.min_day = int(np.where(predicted_values == np.min(predicted_values))[0])
             self.predicted_values = predicted_values.tolist()
             self.get_model_data()
 
         except Exception as err:
             print(f'Error during training model: {err}')
+            tb.print_exc()
 
     def get_model_data(self):
         print('--- KEY INFORMATION ---')
@@ -490,3 +492,35 @@ class CovidData(object):
         except Exception as e:
             print(f'ERROR - Data failed to plot.\nReason: {e}')
             tb.print_exc()
+
+    @processing
+    @loadup
+    def export_data(self):
+        """
+        Export gathered data as CSV file.
+        """
+        csv_file = f'data_{self.country.lower()}.csv'
+        try:
+            if not path.exists(csv_file):
+                with open(csv_file, 'w', encoding='UTF8') as f:
+                    header = ["Date", "Active", "Confirmed", "Deaths"]
+                    writer = csv.writer(f)
+                    writer.writerow(header)
+
+                    # Go through list of stored points, write to file
+                    for i in range(self.point_count):
+                        data_input = [
+                            str(self.data["date"][i]),
+                            str(self.data["active"][i]),
+                            str(self.data["confirmed"][i]),
+                            str(self.data["deaths"][i])
+                        ]
+                        writer.writerow(data_input)
+
+                print("Data compiled and exported to CSV file.")
+
+            else:
+                print(f'Data for {self.country} has already been exported to CSV file.')
+
+        except Exception as e:
+            lg.warn(f'Export error: {e}')

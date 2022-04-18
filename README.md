@@ -1,12 +1,12 @@
 # COVID-19 TRACKER
 
-###Overview
+### Overview
 This project aims to hone my Python skills by creating a COVID-19 stats tracker to monitor online data for various countries. 
 
-###Data Source
+### Data Source
 [COVID-19 API](https://api.covid19api.com)
 
-###Key Python Skills
+### Key Python Skills
 **General syntax & practices**
 - Docstrings and comments
 - Lambda functions
